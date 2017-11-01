@@ -2,6 +2,7 @@ import time
 import gensim
 import random
 import string
+import numpy as np
 
 
 class BlogWriter():
@@ -11,14 +12,13 @@ class BlogWriter():
     '''
 
     def __init__(self, file_name, n_grams=2, num_words=10, topic="beer",
-                 topic_check=2, first_words="In the begining"):
+                 topic_check=2):
         self.f = open(file_name)
         self.n_gram = n_grams
         self.num_words = num_words
         self.topic = topic
         self.topic_n = topic_check
         self.model = self.get_google()
-        self.first_words = first_words
 
     def letters_only(self, input_string):
         '''
@@ -117,10 +117,13 @@ class BlogWriter():
 
     def get_cos_sim(self, word):
         ret = 0
-        try:
-            ret = self.model.wv.similarity(self.topic, word)
-        except:
+        if self.topic_n == 1:
             ret = (random.randint(0,3) + random.randint(0,3))/7
+        else:
+            try:
+                ret = self.model.wv.similarity(self.topic, word)
+            except:
+                ret = 0.0
         return ret
 
     def make_random_story(self):
@@ -158,21 +161,42 @@ class BlogWriter():
             dct = self.associated_trigrams(self.f)
         lst = []
         start = 0 - n_gram
-        if n_gram >= 2:
-            keys = [a[0] for a in dct.keys()]
+
+        keys = list(dct.keys())
+        print(keys[0])
+        if n_gram == 1:
+            lst = [random.choice(keys)]
         else:
-            keys = list(dct.keys())
-        lst = self.first_words.split()
+            lst = list(random.choice(keys))
+        print(lst)
         while len(lst) < self.num_words:
             try:
-                a_tuple = tuple(lst[start:])
                 if n_gram == 1:
-                    a_tuple = (a_tuple[0])
+
+                    a_tuple = (lst[-1])
+                else:
+                    a_tuple = tuple(lst[start:])
                 b_lst = dct[a_tuple]
-                c_lst = [random.choice(b_lst) for
-                         n in range(self.topic_n)]
+                c_lst = np.random.choice(b_lst, self.topic_n)
                 sims = [self.get_cos_sim(a) for a in c_lst]
                 lst.append(c_lst[sims.index(max(sims))])
             except:
                 lst.append(random.choice(keys))
-        return ' '.join(lst)
+
+        # punctuation
+        period = True
+        endings = '.?!'
+        nlst = []
+        for word in lst:
+            word_lst = list(word)
+            if period == True:
+                # capitalize it
+                word_lst[0] = word_lst[0].upper()
+                word = ''.join(word_lst)
+                period = False
+            if word_lst[-1] in endings:
+                period = True
+            if word == 'i':
+                word.upper()
+            nlst.append(word)
+        return ' '.join(nlst)
