@@ -1,5 +1,8 @@
-import string
+import time
+import gensim
 import random
+import string
+
 
 class BlogWriter():
     '''
@@ -7,10 +10,15 @@ class BlogWriter():
     my Geeks Who Drink Blogs for me.  Because how Geek is that?
     '''
 
-    def __init__(self, file_name, n_grams=2, num_words=10):
+    def __init__(self, file_name, n_grams=2, num_words=10, topic="beer",
+                 topic_check=2, first_words="In the begining"):
         self.f = open(file_name)
         self.n_gram = n_grams
         self.num_words = num_words
+        self.topic = topic
+        self.topic_n = topic_check
+        self.model = self.get_google()
+        self.first_words = first_words
 
     def letters_only(self, input_string):
         '''
@@ -18,7 +26,7 @@ class BlogWriter():
         '''
         good = "abcdefghijklmnopqrstuvwxyz1234567890'.-?!"
         input_string = input_string.lower()
-        lst = [a for a in input_string if a in string.ascii_lowercase]
+        lst = [a for a in input_string]
         return ''.join(lst)
 
     def associated_unigrams(self, f):
@@ -92,6 +100,29 @@ class BlogWriter():
                 dct[(a)] = [b]
         return dct
 
+    def get_google(self):
+        '''
+        Loads google news word2vec model
+        '''
+        start = time.clock()
+        # b = '../model/300features_5min_word_count_10context.npy'
+        b = 'model/GoogleNews-vectors-negative300.bin'
+        try:
+            model = gensim.models.KeyedVectors.load_word2vec_format(b, binary=True)
+        except:
+            model = gensim.models.Word2Vec.load(b)
+        model.init_sims(replace=True)  # save memory
+        print("This took only {:.3f}s".format(time.clock()-start))
+        return model
+
+    def get_cos_sim(self, word):
+        ret = 0
+        try:
+            ret = self.model.wv.similarity(self.topic, word)
+        except:
+            ret = (random.randint(0,3) + random.randint(0,3))/7
+        return ret
+
     def make_random_story(self):
 
         '''
@@ -131,15 +162,17 @@ class BlogWriter():
             keys = [a[0] for a in dct.keys()]
         else:
             keys = list(dct.keys())
-        if n_gram == 1:
-            lst = [random.choice(list(dct.keys()))]
-        else:
-            lst = list(random.choice(list(dct.keys())))
+        lst = self.first_words.split()
         while len(lst) < self.num_words:
-            a = tuple(lst[start:])
-            if n_gram == 1:
-                a = (a[0])
-            b = dct[a]
-            c = random.choice(b)
-            lst.append(c)
+            try:
+                a_tuple = tuple(lst[start:])
+                if n_gram == 1:
+                    a_tuple = (a_tuple[0])
+                b_lst = dct[a_tuple]
+                c_lst = [random.choice(b_lst) for
+                         n in range(self.topic_n)]
+                sims = [self.get_cos_sim(a) for a in c_lst]
+                lst.append(c_lst[sims.index(max(sims))])
+            except:
+                lst.append(random.choice(keys))
         return ' '.join(lst)
