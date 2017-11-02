@@ -163,7 +163,6 @@ class BlogWriter():
         start = 0 - n_gram
 
         keys = list(dct.keys())
-        print(keys[0])
         if n_gram == 1:
             lst = [random.choice(keys)]
         else:
@@ -194,9 +193,11 @@ class BlogWriter():
                 word_lst[0] = word_lst[0].upper()
                 word = ''.join(word_lst)
                 period = False
-            if word_lst[-1] in endings:
+            if word_lst[-1] in endings or word == '-break-':
                 period = True
             if word == 'i':
                 word.upper()
             nlst.append(word)
-        return ' '.join(nlst)
+
+        story = ' '.join(nlst).replace('-break-','\n').replace(' i ',' I ')
+        return story

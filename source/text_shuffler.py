@@ -14,12 +14,17 @@ class ShuffleText():
         paragraph = ''
         lst = []
         with open(self.file_name) as f:
-            lst = f.readlines()
+            for line in f.readlines():
+                if len(line) >= 2:
+                    lst.append(line)
+                else:
+                    lst.append('-break-')
         new = ''
         print(len(lst))
         for i in range(self.shuffles):
             random.shuffle(lst)
             new = new + ' '.join(lst)
-        new = new.replace('/n',' ')
+        new.replace(' /n ','-break-').replace('/n','-break-')
+
         with open(output, 'w') as f:
             f.write(new)
