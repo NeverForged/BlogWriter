@@ -21,8 +21,11 @@ class ShuffleText():
                     lst.append('-break-')
         new = ''
         print(len(lst))
-        for i in range(self.shuffles):
-            random.shuffle(lst)
+        if self.shuffles >= 1:
+            for i in range(self.shuffles):
+                random.shuffle(lst)
+                new = new + ' '.join(lst)
+        else:
             new = new + ' '.join(lst)
         new.replace(' /n ','-break-').replace('/n','-break-')
 
