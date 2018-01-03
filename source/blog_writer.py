@@ -2,7 +2,9 @@ import time
 import gensim
 import random
 import string
+import pickle
 import numpy as np
+from nltk import pos_tag, word_tokenize
 
 
 class BlogWriter():
@@ -12,13 +14,18 @@ class BlogWriter():
     '''
 
     def __init__(self, file_name, n_grams=2, num_words=10, topic="beer",
-                 topic_check=2):
+                 topic_check=2, model=None, verbose=False):
         self.f = open(file_name)
         self.n_gram = n_grams
         self.num_words = num_words
         self.topic = topic
         self.topic_n = topic_check
-        self.model = self.get_google()
+        d_name = 'data/basic_english.pickle'
+        with open(d_name, 'rb') as f:
+            self.class_dictionary = pickle.load(f, encoding='UTF-8')
+        self.verbose = verbose
+        if model == None:
+            self.model = self.get_google()
 
     def letters_only(self, input_string):
         '''
@@ -28,6 +35,18 @@ class BlogWriter():
         input_string = input_string.lower()
         lst = [a for a in input_string]
         return ''.join(lst)
+
+    def replace_punctuation(self, input_text):
+        '''
+        breaks up punctuation to avoid it.
+        '''
+        txt = input_text.replace('...', ' ...').replace('.',' .')
+        txt = txt.replace('. . .','...')
+        txt = txt.replace('?',' ?').replace('!',' !')
+        txt = txt.replace('(','( ').replace(')',' )')
+        txt = txt.replace('"',' " ')
+        txt = txt.replace('-', ' - ')
+        return txt
 
     def associated_unigrams(self, f):
         '''
@@ -47,9 +66,11 @@ class BlogWriter():
         >>> with open('../data/alice.txt') as f:
         ...     d = associated_unigrams(f)
         >>> d[('among')]
-        ['the', 'those', 'them', 'the', 'the', 'the', 'the', 'the', 'the', 'mad', 'the', 'them']
+        ['the', 'those', 'them', 'the', 'the', 'the', 'the']
         '''
-        text = f.read().split()
+        text = f.read()
+        text = self.replace_punctuation(text)
+        text = text.split()
         dct = {}
         for n in range(len(text)-1):
             a = self.letters_only(text[n])
@@ -65,7 +86,9 @@ class BlogWriter():
         INPUT: file
         OUTPUT: dictionary
         '''
-        text = f.read().split()
+        text = f.read()
+        text = self.replace_punctuation(text)
+        text = text.split()
         dct = {}
         for n in range(len(text)-2):
             a = (self.letters_only(text[n]), self.letters_only(text[n+1]))
@@ -87,7 +110,9 @@ class BlogWriter():
 
         Words should be included in the list the number of times they appear.
         '''
-        text = f.read().split()
+        text = f.read()
+        text = self.replace_punctuation(text)
+        text = text.split()
         dct = {}
         for n in range(len(text)-3):
             a = (self.letters_only(text[n]),
@@ -125,6 +150,32 @@ class BlogWriter():
             except:
                 ret = 0.0
         return ret
+
+
+    def check_replace(self, tag):
+        pass_thru = ['CD',  # CD: numeral, cardinal
+                     'EX',  # EX: existential there
+                     'FW',  # FW: foreign word
+                     'LS',  # LS: list item marker
+                     'JJ',  # JJ: adjective or numeral, ordinal
+                     'NNP',  # NNP: noun, proper, singular
+                     'NNPS',  # NNPS: noun, proper, plural
+                     'PRP',  # PRP: pronoun, personal
+                     'SYM',  # SYM: symbol
+                     'TO',  # TO: "to" as preposition or infinitive marker
+                     'POS',
+                     '$',  # $: dollar
+                     '(',
+                     ')',
+                     ',',
+                     '.',
+                     ':',
+                     '"'
+                     ]
+        if tag in pass_thru:
+            return True
+        else:
+            return False
 
     def make_random_story(self):
 
@@ -186,18 +237,129 @@ class BlogWriter():
         period = True
         endings = '.?!'
         nlst = []
-        for word in lst:
-            word_lst = list(word)
-            if period == True:
-                # capitalize it
-                word_lst[0] = word_lst[0].upper()
-                word = ''.join(word_lst)
-                period = False
-            if word_lst[-1] in endings or word == '-break-':
-                period = True
-            if word == 'i':
-                word.upper()
-            nlst.append(word)
+        return lst
 
-        story = ' '.join(nlst).replace('-break-','\n').replace(' i ',' I ')
-        return story
+    def basic_english_fit(self, input_text):
+        '''
+        (from BasicEnglishTranslator)
+        The actual translation occurs here:
+        Methodology:
+            Takes an input text, turns it to a list w/parts of speach tagging,
+            then based on the part of speach, replaces certain words with
+            Basic English words from the dictionary.
+        Input: String
+        '''
+        print('start',input_text)
+        # timer...
+        start = time.clock()
+        # printable filter
+        prt = set(string.printable)
+        input_text = input_text #filter(lambda x: x in prt, input_text)
+        # save input text
+        self.real_text = input_text
+        # add to sentences for next time we rebuild our model...
+        print('input_text:',input_text)
+        words = pos_tag(input_text.split(' '))  # makes a list of words...
+        print('words', words)
+        self.real_list = words
+        # These simply pass thru the model
+        pass_thru = ['CD',  # CD: numeral, cardinal
+                     'EX',  # EX: existential there
+                     'FW',  # FW: foreign word
+                     'LS',  # LS: list item marker
+                     'JJ',  # JJ: adjective or numeral, ordinal
+                     'NNP',  # NNP: noun, proper, singular
+                     'NNPS',  # NNPS: noun, proper, plural
+                     'PRP',  # PRP: pronoun, personal
+                     'SYM',  # SYM: symbol
+                     'TO',  # TO: "to" as preposition or infinitive marker
+                     'POS',
+                     '$',  # $: dollar
+                     '(',
+                     ')',
+                     ',',
+                     '.',
+                     ':',
+                     '"'
+                     ]
+        # make these Basic
+        make_simple = ['CC',  # CC: conjunction, coordinating
+                       'DT',  # DT: determiner
+                       'IN',  # IN: preposition or conjunction, subordinating
+                       'JJR',  # JJR: adjective, comparative
+                       'JJS',  # JJR: adjective, comparative
+                       'MD',  # MD: modal auxiliary
+                       'NN',  # NN: noun, common, singular or mass
+                       'NNS',  # NNS: noun, common, plural
+                       'PDT',  # PDT: pre-determiner
+                       'PDT',  # PDT: pre-determiner
+                       'PRP$',  # PRP$: pronoun, possessive
+                       'RB',  # RB: adverb
+                       'RBR',  # RBR: adverb, comparative
+                       'RBS',  # RBS: adverb, superlative
+                       'RP',  # RP: particle
+                       'UH',  # UH: interjection
+                       'VB',  # VB: verb, base form
+                       'VBD',  # VBD: verb, past tense
+                       'VBG',  # VBG: verb, present participle or gerund
+                       'VBN',  # VBN: verb, past participle
+                       'VBP',  # VBP: verb, present tense, not 3rd person sing
+                       'VBZ',  # VBZ: verb, present tense, 3rd person singular
+                       'WDT',  # WDT: WH-determiner
+                       'WP',  # WP: WH-pronoun
+                       'WP$',  # WP$: WH-pronoun, possessive
+                       'WRB'  # WRB: Wh-adverb
+                       ]
+        count_replacements = 0
+        self.lst_ret = []
+        for idx, word in enumerate(words):
+            if word[1] in pass_thru or len(word[0]) <= 1:
+                # put it in and move on... it's proper or whatever
+                self.lst_ret.append(word[0])
+            else:
+                # We have a word we need to replace...
+                # bath it...
+                clean = word[0].strip(string.punctuation).lower()
+                # ...and bring it to the function
+                # already simple... throw it in and move on
+                if clean in self.class_dictionary:
+                    temp = self.class_dictionary[clean][0]
+                    if pos_tag([temp])[0][1] == word[1]:
+                        self.lst_ret.append(self.retain_capitalization(temp,
+                                                                   word[0]))
+                    else:
+                        self.lst_ret.append(word[0])
+                else:
+                    self.lst_ret.append(word[0])
+        end = time.clock()
+        if self.verbose:
+            print('Time: {:.4f}s'.format(end - start))
+        print('lst_ret',self.lst_ret)
+        txt = ' '.join(self.lst_ret)
+        #txt = self.replace_punctuation(' '.join(self.lst_ret))
+        #txt = txt.encode('utf-8')
+        #txt = re.sub("\xe2\x80\x93", "-", txt)
+        self.basic_list = self.lst_ret
+        self.basic_text = txt
+        print('end', txt)
+        return txt
+
+    def rewrite_text(self, lst):
+        txt = ' '.join(lst)
+        new_lst = self.basic_english_fit(txt).split()
+        return new_lst
+
+    def retain_capitalization(self, new_word, original_word):
+        '''
+        Checks the original_word for capitalization, if it has it, capitalizes
+        the frst letter of new_word, returns new_word.
+        '''
+        if original_word[0] in list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'):
+            lst = list(new_word)
+            lst[0] = lst[0].upper()
+            new_word = ''.join(lst)
+        return new_word
+
+    def write(self):
+        lst =  self.make_random_story()
+        return self.rewrite_text(lst)
